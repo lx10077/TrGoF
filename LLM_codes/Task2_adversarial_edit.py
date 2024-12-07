@@ -1,58 +1,53 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import math as ma
 import numpy as np
 from tqdm import tqdm
-from IPython import embed
-from scipy.integrate import quad, dblquad
 from scipy.stats import gamma, norm
 import torch
-import json
 import argparse
+import pickle
+import copy
 from collections import defaultdict
 from transformers import AutoTokenizer
 
 
 parser = argparse.ArgumentParser(description="Experiment Settings")
-
 parser.add_argument('--method',default="Gumbel",type=str)
 parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
 # parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
 parser.add_argument('--seed',default=1,type=int)
-parser.add_argument('--temp',default=0.1, type=float)
 parser.add_argument('--c',default=5,type=int)
-parser.add_argument('--batch_size',default=10,type=int)
 parser.add_argument('--seed_way',default="noncomm_prf",type=str)
 parser.add_argument('--m',default=400,type=int)
 parser.add_argument('--T',default=1000,type=int)
-parser.add_argument('--N',default=4,type=int)
-parser.add_argument('--prompt_tokens',default=50,type=int)
-parser.add_argument('--buffer_tokens',default=20,type=int)
-parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--norm',default=1,type=int)
-parser.add_argument('--rt_translate', action='store_true')
-parser.add_argument('--language',default="french",type=str)
 parser.add_argument('--truncate_vocab',default=8,type=int)
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
+parser.add_argument('--non_wm_temp',default=0.7,type=float)
+parser.add_argument('--alpha',default=0.01,type=float)
 
 args = parser.parse_args()
-
 
 key = args.seed
 torch.manual_seed(key)
 seed_key = 15485863
-segment = args.N
 c = args.c
 T = args.T
 m = args.m
 mask = True
+temperatures = args.all_temp
+latter = f"nsiuwm-{args.non_wm_temp}"
+alpha = args.alpha
 
-import pickle
-import copy
+if args.model == "facebook/opt-1.3b":
+    size = "1p3"
+elif args.model == "princeton-nlp/Sheared-LLaMA-2.7B":
+    size = "2p7"
+else:
+    raise ValueError(f"No name for this model: {args.model}! Currently give name to either facebook/opt-1.3b or princeton-nlp/Sheared-LLaMA-2.7B.")
 
 
-
-def compute_score(Ys, alpha=1., s=2,eps=1e-10, mask=mask):
+def compute_score(Ys, s=2,eps=1e-10, mask=mask):
     # assert -1 <= s <= 2
     ps = 1- Ys
     ps = np.sort(ps, axis=-1)
@@ -98,7 +93,7 @@ def compute_quantile(m, alpha, s, mask=True):
     return np.mean(qs,axis=0)
 
 
-def HC_for_a_given_fraction(Ys, ratio, alpha=0.05, s=2, mask=True):
+def HC_for_a_given_fraction(Ys, ratio, alpha=0.01, s=2, mask=True):
     m = (Ys.shape)[-1]
     if ratio <= 1 and type(ratio)==float:
         given_m = int(ratio*m)
@@ -133,7 +128,7 @@ def f_opt(r, delta):
     return np.log(inte_here*r**(delta/(1-delta))+ r**(1/rest-1))
     
 
-def h_opt_gum(Ys, delta0=0.2, alpha=0.05):
+def h_opt_gum(Ys, delta0=0.2, alpha=0.01):
     # Compute critical values
     Ys = np.array(Ys)
     h_ars_Ys = f_opt(Ys, delta0)
@@ -251,10 +246,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.figure(figsize=[8, 6])
-# plt.rcParams["font.family"] = "Times New Roman"
 plt.rcParams.update({
-    'font.size': 12,
-    # 'text.usetex': True,
+    'font.size': 14,
     'text.latex.preamble': r'\usepackage{amsfonts}'
 })
 
@@ -265,7 +258,7 @@ results = dict()
 
 
 
-def remove_repeated(Ys, filered_length=None,filter_data=False):
+def remove_repeated(Ys, filered_length=None,filter_data=False, mute=True):
     unique_elements_num = []
     filtered_rows = []
     # Iterate over each row in the array
@@ -281,16 +274,17 @@ def remove_repeated(Ys, filered_length=None,filter_data=False):
     unique_elements_num = np.array(unique_elements_num)
     if filered_length is not None:
         filtered_rows = np.array(filtered_rows)
-    
-    print("mean:", np.mean(unique_elements_num))
-    print("If we want at 1000 samples, there should >=", 1000/len(Ys))
-    print(">=350:", np.mean(unique_elements_num>=350))
-    print(">=300:", np.mean(unique_elements_num>=300))
-    print(">=250:", np.mean(unique_elements_num>=250))
-    print(">=200:", np.mean(unique_elements_num>=200))
-    print(">=150:", np.mean(unique_elements_num>=150))
-    print(">=100:", np.mean(unique_elements_num>=100))
-    print(">=50:", np.mean(unique_elements_num>=50))
+
+    if not mute:
+        print("mean:", np.mean(unique_elements_num))
+        print("If we want at 1000 samples, there should >=", 1000/len(Ys))
+        print(">=350:", np.mean(unique_elements_num>=350))
+        print(">=300:", np.mean(unique_elements_num>=300))
+        print(">=250:", np.mean(unique_elements_num>=250))
+        print(">=200:", np.mean(unique_elements_num>=200))
+        print(">=150:", np.mean(unique_elements_num>=150))
+        print(">=100:", np.mean(unique_elements_num>=100))
+        print(">=50:", np.mean(unique_elements_num>=50))
 
     if filered_length is not None:
         return filtered_rows
@@ -350,13 +344,7 @@ def replace_largest_k_with_uniform(Y, k, if_return_index=False):
         return Y_modified
 
 
-import nltk
-import torch
-import random
-import numpy as np
-from tqdm import tqdm
-from nltk import pos_tag
-from nltk.corpus import wordnet
+
 
 
 def find_nearest_indices(Ind, AInd):
@@ -440,103 +428,99 @@ def compute_Ys(A, corrupted_data, prompts, is_null=False):
     return np.array(full_Ys)
 
 
-temperatures = [0.1, 0.3, 0.5, 0.7, 1]
 
-latter = "nsiuwm-0.7"
 
-for size in ["1p3"]:
-    if size == "1p3":
-        vocab_size = 50272
-    else:
-        vocab_size = 32000
+if size == "1p3":
+    vocab_size = 50272
+else:
+    vocab_size = 32000
 
-    for k, temp in enumerate(temperatures):
-        print()
-        print("Working on temperature:", temp)
+for k, temp in enumerate(temperatures):
+    print()
+    print("Working on temperature:", temp)
 
-        # From Gumbel-max
-        Gum_name = f"raw_data/{size}B-Gumbel-c{c}-m400-T1000-noncomm_prf-15485863-temp{temp}-{latter}.pkl"
-        Gum_result = pickle.load(open(Gum_name, "rb"))
-        Gum_Ys = np.array(Gum_result["watermark"]["Ys"])
-        prompts = Gum_result["prompts"]
-        repeated = np.array(Gum_result["watermark"]["where_watermark"])
-        watermarked_samples = Gum_result["watermark"]["tokens"]
+    # From Gumbel-max
+    Gum_name = f"raw_data/{size}B-Gumbel-c{c}-m{m}-T{T}-noncomm_prf-15485863-temp{temp}-{latter}.pkl"
+    Gum_result = pickle.load(open(Gum_name, "rb"))
+    Gum_Ys = np.array(Gum_result["watermark"]["Ys"])
+    prompts = Gum_result["prompts"]
+    repeated = np.array(Gum_result["watermark"]["where_watermark"])
+    watermarked_samples = Gum_result["watermark"]["tokens"]
 
-        save_dir = f"corrupted_data/{size}B-Gumbel-c{c}-m400-T1000-noncomm_prf-15485863-temp{temp}-{latter}-cor"
+    save_dir = f"corrupted_data/{size}B-Gumbel-c{c}-m400-T1000-noncomm_prf-15485863-temp{temp}-{latter}-cor"
 
-        print("Load Gum results...\n")
-        print(Gum_Ys.shape)
+    print("Load Gum results...\n")
+    print(Gum_Ys.shape)
 
-        corruptions = [10, 20, 40, 80, 120]
+    corruptions = [10, 20, 40, 80, 120]
 
-        here_save_dir = save_dir+f"-all.pkl"  
-    
-        if not os.path.exists(here_save_dir):
-            print("we generate the result!")
+    here_save_dir = save_dir+f"-all.pkl"  
+
+    if not os.path.exists(here_save_dir):
+        print("we generate the result!")
+
+        os.makedirs(os.path.dirname(here_save_dir), exist_ok=True)
+
+        corrupted_Y_dict = dict()
+        corrupted_Y_dict[0] = Gum_Ys.tolist()
+        
+        for corrup in corruptions:
+            corrup_dict= dict()
+            generator = torch.Generator()
+            A = lambda inputs : gumbel_key_func(generator,inputs, vocab_size, seed_key, c, args.seed_way)
+
+            corrup_tokens, corrup_text = adversarial_edit(Gum_Ys, watermarked_samples, vocab_size, top_k=corrup, new_tokens=None)
+            print("finish corrup")
+            corrup_Y = compute_Ys(A, corrup_tokens, prompts)
+            print("finish computing Y")
+
+            corrupted_Y_dict[corrup] = corrup_Y.tolist()
+
+            corrup_dict["corrup_tokens"] = copy.deepcopy(corrup_tokens)
+            corrup_dict["corrup_text"] = corrup_text
+            corrup_dict["corrup_Ys"] = corrup_Y.tolist()
+            here_save_dir = save_dir+f"{corrup}.pkl"
 
             os.makedirs(os.path.dirname(here_save_dir), exist_ok=True)
-
-            corrupted_Y_dict = dict()
-            corrupted_Y_dict[0] = Gum_Ys.tolist()
-            
-            for corrup in corruptions:
-                corrup_dict= dict()
-                generator = torch.Generator()
-                A = lambda inputs : gumbel_key_func(generator,inputs, vocab_size, seed_key, c, args.seed_way)
-
-                corrup_tokens, corrup_text = adversarial_edit(Gum_Ys, watermarked_samples, vocab_size, top_k=corrup, new_tokens=None)
-                print("finish corrup")
-                corrup_Y = compute_Ys(A, corrup_tokens, prompts)
-                print("finish computing Y")
-
-                corrupted_Y_dict[corrup] = corrup_Y.tolist()
-
-                corrup_dict["corrup_tokens"] = copy.deepcopy(corrup_tokens)
-                corrup_dict["corrup_text"] = corrup_text
-                corrup_dict["corrup_Ys"] = corrup_Y.tolist()
-                here_save_dir = save_dir+f"{corrup}.pkl"
-
-                os.makedirs(os.path.dirname(here_save_dir), exist_ok=True)
-                pickle.dump(corrup_dict,open(here_save_dir,"wb"))
-            
-            pickle.dump(corrupted_Y_dict, open(here_save_dir,"wb"))    
-        else:
-            print("we load the result!")
-            with open(here_save_dir, "rb") as file:
-                corrupted_Y_dict = pickle.load(file)
-
-
-        fig, ax = plt.subplots(nrows=1, ncols=len(corruptions)+1, figsize=(4*(len(corruptions)+1),4))
-        alpha = 0.01
-
-        print("finish corruption and computation of Y.")
+            pickle.dump(corrup_dict,open(here_save_dir,"wb"))
         
-        if temp >= 0.5:
-            use_log = True
-        else:
-            use_log = False
+        pickle.dump(corrupted_Y_dict, open(here_save_dir,"wb"))    
+    else:
+        print("we load the result!")
+        with open(here_save_dir, "rb") as file:
+            corrupted_Y_dict = pickle.load(file)
 
-        H2set = plot_length_on_axis(ax[0], Gum_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
-        final_result = dict()
-        final_result["H1-watermark"] = H2set
 
-        for l, each_corrup in enumerate(corruptions):
-            corrup_Ys = np.array(corrupted_Y_dict[each_corrup])[0]
-            ax[l+1].set_title(f"Replace {each_corrup}")
-            H2set = plot_length_on_axis(ax[l+1], corrup_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
-            final_result[each_corrup] = H2set
+    fig, ax = plt.subplots(nrows=1, ncols=len(corruptions)+1, figsize=(4*(len(corruptions)+1),4))
 
-        notation = "LLMNoLarge"
-        save_dir = f"cor_data/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pkl"
-        dir_path = os.path.dirname(save_dir)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-        pickle.dump(final_result, open(save_dir, "wb"))
+    print("finish corruption and computation of Y.")
+    
+    if temp >= 0.5:
+        use_log = True
+    else:
+        use_log = False
 
-        plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
-        plt.tight_layout()
-        fig_save_dir = f"cor_fig/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pdf"
-        dir_path = os.path.dirname(fig_save_dir)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-        plt.savefig(fig_save_dir, dpi=300)
+    H2set = plot_length_on_axis(ax[0], Gum_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
+    final_result = dict()
+    final_result["H1-watermark"] = H2set
+
+    for l, each_corrup in enumerate(corruptions):
+        corrup_Ys = np.array(corrupted_Y_dict[each_corrup])[0]
+        ax[l+1].set_title(f"Replace {each_corrup}")
+        H2set = plot_length_on_axis(ax[l+1], corrup_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
+        final_result[each_corrup] = H2set
+
+    notation = "LLMNoLarge"
+    save_dir = f"cor_data/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pkl"
+    dir_path = os.path.dirname(save_dir)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    pickle.dump(final_result, open(save_dir, "wb"))
+
+    plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
+    plt.tight_layout()
+    fig_save_dir = f"cor_fig/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pdf"
+    dir_path = os.path.dirname(fig_save_dir)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    plt.savefig(fig_save_dir, dpi=300)

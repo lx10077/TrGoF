@@ -14,26 +14,22 @@ from collections import defaultdict
 
 
 parser = argparse.ArgumentParser(description="Experiment Settings")
-
 parser.add_argument('--method',default="Gumbel",type=str)
 parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
-parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
+# parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
 parser.add_argument('--seed',default=1,type=int)
-parser.add_argument('--temp',default=0.1, type=float)
 parser.add_argument('--c',default=5,type=int)
-parser.add_argument('--batch_size',default=8,type=int)
-# parser.add_argument('--seed_way',default="skipgram_prf",type=str)
 parser.add_argument('--seed_way',default="noncomm_prf",type=str)
 parser.add_argument('--m',default=400,type=int)
 parser.add_argument('--T',default=1000,type=int)
-parser.add_argument('--N',default=6,type=int)
-parser.add_argument('--prompt_tokens',default=50,type=int)
-parser.add_argument('--buffer_tokens',default=20,type=int)
-parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--norm',default=1,type=int)
-parser.add_argument('--rt_translate', action='store_true')
-parser.add_argument('--language',default="french",type=str)
-parser.add_argument('--truncate_vocab',default=8,type=int)
+parser.add_argument('--non_wm_temp',default=0.7,type=float)
+parser.add_argument('--alpha',default=0.01,type=float)
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
+
+parser.add_argument('--substitution', action='store_true', help="If set, substitution will be True; otherwise, it defaults to False.")
+parser.add_argument('--deletion', action='store_true', help="If set, deletion will be True; otherwise, it defaults to False.")
+parser.add_argument('--insertion', action='store_true', help="If set, insertion will be True; otherwise, it defaults to False.")
+
 args = parser.parse_args()
 
 
@@ -46,12 +42,19 @@ else:
 
 key = args.seed
 torch.manual_seed(key)
-seed_key = 15485863
-segment = args.N
 c = args.c
 T = args.T
-m = global_m = args.m
-
+m = args.m
+alpha = args.alpha
+considered_edits = []
+if args.substitution:
+    considered_edits.append("sub")
+if args.deletion:
+    considered_edits.append("ist")
+if args.insertion:
+    considered_edits.append("dlt")
+if not considered_edits:
+    raise ValueError("You should consider at least one editing method from [substitution, deletion, insertion].")
 
 import pickle
 
@@ -106,7 +109,7 @@ def compute_quantile(m, alpha, s, mask):
     return np.mean(qs,axis=0)
 
 
-def HC_for_a_given_fraction(Ys, ratio, alpha=0.05, s=2, mask=True):
+def HC_for_a_given_fraction(Ys, ratio, alpha=0.01, s=2, mask=True):
     # embed()
     m = (Ys.shape)[-1]
     if ratio <= 1 and type(ratio)==float:
@@ -159,7 +162,7 @@ def f_opt(r, delta):
     return np.log(inte_here*r**(delta/(1-delta))+ r**(1/rest-1))
 
 
-def h_opt_gum(Ys, delta0=0.2, alpha=0.05):
+def h_opt_gum(Ys, delta0=0.2, alpha=0.01):
     # Compute critical values
     Ys = np.array(Ys)
     h_ars_Ys = f_opt(Ys, delta0)
@@ -190,7 +193,7 @@ def clean_data(Y, m=None):
     cleaned_Y = cleaned_Y[:new_N*m]
     return cleaned_Y.reshape(new_N, m)
     
-def remove_repeated(Ys, filered_length=None,filter_data=False,first=500):
+def remove_repeated(Ys, filered_length=None,filter_data=False,first=500,mute=True):
     unique_elements_num = []
     filtered_rows = []
     # Iterate over each row in the array
@@ -207,14 +210,15 @@ def remove_repeated(Ys, filered_length=None,filter_data=False,first=500):
     if filered_length is not None:
         filtered_rows = np.array(filtered_rows)
     
-    print("mean:", np.mean(unique_elements_num))
-    print("If we want at 500 samples, there should >=", 500/len(Ys))
-    print(">=250:", np.mean(unique_elements_num>=250))
-    print(">=200:", np.mean(unique_elements_num>=200))
-    print(">=150:", np.mean(unique_elements_num>=150))
-    print(">=100:", np.mean(unique_elements_num>=100))
-    print(">=50:", np.mean(unique_elements_num>=50))
-    print()
+    if not mute:
+        print("mean:", np.mean(unique_elements_num))
+        print("If we want at 500 samples, there should >=", 500/len(Ys))
+        print(">=250:", np.mean(unique_elements_num>=250))
+        print(">=200:", np.mean(unique_elements_num>=200))
+        print(">=150:", np.mean(unique_elements_num>=150))
+        print(">=100:", np.mean(unique_elements_num>=100))
+        print(">=50:", np.mean(unique_elements_num>=50))
+        print()
 
     if filered_length is not None:
         return filtered_rows
@@ -237,17 +241,13 @@ def remove_repeated(Ys, filered_length=None,filter_data=False,first=500):
 def plot_robust_on_axis(current_ax, Y, alpha, legend=True, x_point=None, mask=True, norepeat=False):
     ## Assume Y is three dimension tensor
     N_corrup, _, used_m = Y.shape
-    if N_corrup <= 9:
-        delta_gap = 0.1
-    else:
-        delta_gap = 0.05
+    delta_gap = 0.05
     x =  np.linspace(0,(N_corrup-1)*delta_gap,N_corrup)
     # assert len(x) == N_corrup, f"len x = {len(x)}, N_corrup = {N_corrup}"
     if x_point is not None and x_point < used_m:
         Y = Y[:,:, -x_point:]
         used_m = Y.shape[-1]
         print("Used_m:", used_m)
-
 
     result_set = defaultdict(dict)
     different_s = ["log", "ars", 2, 1.5, 1, 0.5, 0, "opt-0.3", "opt-0.2", "opt-0.1"]
@@ -261,7 +261,6 @@ def plot_robust_on_axis(current_ax, Y, alpha, legend=True, x_point=None, mask=Tr
                     here_Y = remove_repeated(Y[corrup_level], filered_length=250)
                 else:
                     here_Y = Y[corrup_level]
-                print(here_Y.shape)
 
                 HC, log_critical_value = HC_for_a_given_fraction(here_Y, 1., alpha, s, mask=mask)
                 mean = np.mean(np.log(HC+1e-10) >= log_critical_value)
@@ -275,7 +274,6 @@ def plot_robust_on_axis(current_ax, Y, alpha, legend=True, x_point=None, mask=Tr
                     here_Y = remove_repeated(Y[corrup_level], filered_length=250)
                 else:
                     here_Y = Y[corrup_level]
-                print(here_Y.shape)
 
                 Ylog = Log_score(here_Y, 1)      
                 sum_Ys = np.sum(Ylog, axis=1)
@@ -292,7 +290,6 @@ def plot_robust_on_axis(current_ax, Y, alpha, legend=True, x_point=None, mask=Tr
                     here_Y = remove_repeated(Y[corrup_level], filered_length=250)
                 else:
                     here_Y = Y[corrup_level]
-                print(here_Y.shape)
 
                 Yars = Ars_score(here_Y, 1)      
                 sum_Ys = np.sum(Yars, axis=1)
@@ -339,42 +336,41 @@ plt.rcParams.update({
     'text.latex.preamble': r'\usepackage{amsfonts}'
 })
 
-
-all_tempretures = [0.1, 0.3, 0.5, 0.7, 1]
-alpha = 0.01
-
-
-a = ("sub", "ist", "dlt")
-num = 0.7
+all_tempretures = args.all_temp
+num = args.non_wm_temp
 latter = f"nsiuwm-{num}-11"
-for mask in [True]:
-    for size in ["1p3", "2p7"]:
-        for i, task in enumerate(a):
 
-            fig, ax = plt.subplots(nrows=1, ncols=len(all_tempretures), figsize=(4*len(all_tempretures),4))
-            final_result = dict()
+for mask in [True, False]:
+    for i, task in enumerate(considered_edits):
 
-            if task == "sub":
-                lengs = [400, 400, 400, 200, 200]
-            elif task == "dlt":
-                lengs = [200, 200, 200, 200, 200]
-            else:
-                lengs = [400, 400, 400, 200, 200]
+        fig, ax = plt.subplots(nrows=1, ncols=len(all_tempretures), figsize=(4*len(all_tempretures),4))
+        final_result = dict()
 
-            for j, temp in enumerate(all_tempretures):
+        if task == "sub":
+            lengs = [400, 400, 400, 200, 200]
+        elif task == "dlt":
+            lengs = [200, 200, 200, 200, 200]
+        else:
+            lengs = [400, 400, 400, 200, 200]
 
-                exp_name1 = f"result/{size}B-robust-c{c}-m{m}-T{T}-{args.seed_way}-{key}-temp{temp}-{task}-{latter}.pkl"
-                results1 = pickle.load(open(exp_name1, "rb"))
-                sub_Ys = np.array(results1[task])
-                result = plot_robust_on_axis(ax[j], sub_Ys, alpha, legend=False, x_point=lengs[j], mask=mask, norepeat=False)
-                final_result[temp] = result
+        for j, temp in enumerate(all_tempretures):
 
-            name = "final" ## previous
+            exp_name1 = f"result/{size}B-robust-c{c}-m{m}-T{T}-{args.seed_way}-{key}-temp{temp}-{task}-{latter}.pkl"
+            results1 = pickle.load(open(exp_name1, "rb"))
+            sub_Ys = np.array(results1[task])
+            result = plot_robust_on_axis(ax[j], sub_Ys, alpha, legend=False, x_point=lengs[j], mask=mask, norepeat=False)
+            final_result[temp] = result
 
-            save_dir = f"corrup_result/{size}B-{name}-c{c}-m{m}-T{T}-tempall-alpha{alpha}-{mask}1e-3-{task}-{latter}.pkl"
-            print(save_dir)
-            pickle.dump(final_result, open(save_dir, "wb"))
+        name = "edit" 
 
-            plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
-            plt.tight_layout()
-            plt.savefig(f"corrup_fig/{size}B-{name}-c{c}-m{m}-T{T}-corruption-tempall-alpha{alpha}-{mask}1e-3-{task}-{latter}.pdf", dpi=300)
+        save_dir = f"corrup_result/{size}B-{name}-c{c}-m{m}-T{T}-tempall-alpha{alpha}-{mask}1e-3-{task}-{latter}.pkl"
+        os.makedirs(os.path.dirname(save_dir), exist_ok=True)
+        pickle.dump(final_result, open(save_dir, "wb"))
+
+        plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
+        plt.tight_layout()
+        
+        fig_dir = f"corrup_fig/{size}B-{name}-c{c}-m{m}-T{T}-corruption-tempall-alpha{alpha}-{mask}-{task}-{latter}.pdf"
+        os.makedirs(os.path.dirname(fig_dir), exist_ok=True)
+        plt.savefig(fig_dir, dpi=300)
+

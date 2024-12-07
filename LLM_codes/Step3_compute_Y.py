@@ -6,6 +6,7 @@ from sampling import  gumbel_key_func, gumbel_Y
 import torch
 import argparse
 import gc
+import os
 
 parser = argparse.ArgumentParser(description="Experiment Settings")
 parser.add_argument('--method',default="gumbel",type=str)
@@ -14,7 +15,6 @@ parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
 parser.add_argument('--seed',default=1,type=int)
 parser.add_argument('--temp',default=0.8, type=float)
 parser.add_argument('--c',default=5,type=int)
-parser.add_argument('--batch_size',default=5,type=int)
 parser.add_argument('--seed_way',default="noncomm_prf",type=str)
 parser.add_argument('--m',default=400,type=int)
 parser.add_argument('--T',default=1000,type=int)
@@ -27,6 +27,13 @@ parser.add_argument('--norm',default=1,type=int)
 parser.add_argument('--rt_translate', action='store_true')
 parser.add_argument('--language',default="french",type=str)
 parser.add_argument('--truncate_vocab',default=8,type=int)
+
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
+parser.add_argument('--substitution', action='store_true', help="If set, substitution will be True; otherwise, it defaults to False.")
+parser.add_argument('--deletion', action='store_true', help="If set, deletion will be True; otherwise, it defaults to False.")
+parser.add_argument('--insertion', action='store_true', help="If set, insertion will be True; otherwise, it defaults to False.")
+parser.add_argument('--translation', action='store_true', help="If set, translation will be True; otherwise, it defaults to False.")
+
 args = parser.parse_args()
 args.rt_translate = True
 
@@ -47,13 +54,13 @@ c = args.c
 T = args.T
 N = args.N
 
-compute_sub = True
-compute_del = True
-compute_ist = True
-rt_translate = True
+compute_sub = args.substitution
+compute_del = args.deletion
+compute_ist = args.insertion
+rt_translate = args.translation
 
 used_T = args.T
-all_temperatures = [0.1, 0.3, 0.5, 0.7, 1]
+all_temperatures = args.all_temp
 
 if size == "1p3":
     vocab_size = 50272
@@ -68,6 +75,7 @@ for latter in [f"nsiuwm-{args.non_wm_temp}"]:
         previous_name = f"raw_data/{size}B-Gumbel-c{args.c}-m{args.m}-T{args.T}-{args.seed_way}-15485863-temp{temp}-{latter}.pkl"
         exp_name = f"corrupted_data/{size}B-robust-c{args.c}-m{args.m}-T{args.T}-{args.seed_way}-{args.seed}-{N}-temp{temp}-{latter}"
         exp_name11=f"result/{size}B-robust-c{c}-m{args.m}-T{used_T}-{args.seed_way}-{key}-temp{temp}-{task}-{latter}-{N}.pkl"
+        os.makedirs(os.path.dirname(exp_name11), exist_ok=True)
         return previous_name, exp_name, exp_name11
 
     import pickle
@@ -195,6 +203,7 @@ for latter in [f"nsiuwm-{args.non_wm_temp}"]:
             previous_name = f"raw_data/{size}B-Gumbel-c{args.c}-m{args.m}-T{args.T}-{args.seed_way}-15485863-temp{temp}-{latter}.pkl"
             exp_name = f"corrupted_data/{size}B-robust-c{args.c}-m{args.m}-T{args.T}-{args.seed_way}-{args.seed}-{N}-temp{temp}-{latter}"
             exp_name11 = f"result/{size}B-robust-c{c}-m{args.m}-T{used_T}-{args.seed_way}-{key}-temp{temp}-{args.language}-trans-{latter}.pkl"
+            os.makedirs(os.path.dirname(exp_name11), exist_ok=True)
             return previous_name, exp_name, exp_name11
 
         for temp in all_temperatures:

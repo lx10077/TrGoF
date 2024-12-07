@@ -20,7 +20,6 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Experiment Settings")
 parser.add_argument('--method',default="Gumbel",type=str)
-# parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
 parser.add_argument('--seed',default=15485863,type=int)
 parser.add_argument('--c',default=5,type=int)
 parser.add_argument('--batch_size',default=1,type=int) # batch size, how many prompts are used at the same time to generate texts.
@@ -29,14 +28,15 @@ parser.add_argument('--m',default=400,type=int)  # The length of generated text
 parser.add_argument('--prompt_tokens',default=50,type=int)
 parser.add_argument('--buffer_tokens',default=20,type=int)
 parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--norm',default=1,type=int)
-parser.add_argument('--rt_translate', action='store_true')
-parser.add_argument('--language',default="french",type=str)
+parser.add_argument('--temp',default=1,type=float)
 parser.add_argument('--truncate_vocab',default=8,type=int)
-
+parser.add_argument('--non_wm_temp',default=0.7,type=float)
+parser.add_argument('--alpha',default=0.01,type=float)
 args = parser.parse_args()
 print(args)
 
+alpha = args.alpha
+temp = args.temp
 
 poems_list = [
     'A Shropshire Lad by A.E. Housman',
@@ -146,7 +146,7 @@ T = len(poems_list)                                   # number of prompts/genera
 n_batches = int(np.ceil(len(poems_list) / args.batch_size)) # number of batches
 new_tokens = args.m                           # number of tokens to generate
 buffer_tokens = args.buffer_tokens 
-no_wm_temp = 0.8
+no_wm_temp = args.no_wm_temp
 latter = f"-nsiuwm-{no_wm_temp}"
 print(latter)
 
@@ -197,7 +197,6 @@ def compute_quantile(m, alpha, s, mask):
         qs.append(q)
     return np.mean(qs)
 
-
 for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
 # for used_model in [ "princeton-nlp/Sheared-LLaMA-2.7B"]:
     for creative_generation in [True, False]:
@@ -218,7 +217,6 @@ for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
         vocab_size = model.get_output_embeddings().weight.shape[0]
         eff_vocab_size = vocab_size - args.truncate_vocab
         print(f'Loaded the model (t = {time()-t0} seconds)', vocab_size)
-        temp = 1
 
         #/local_disk0/
         print("Successully loading dataset...")
@@ -228,7 +226,7 @@ for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
         elif used_model == "princeton-nlp/Sheared-LLaMA-2.7B":
             model_name = "2p7B"
         else:
-            model_name = "7B"
+            raise ValueError
 
         prompts = []
         itm = 0
@@ -253,7 +251,7 @@ for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
                             temperature=temp, 
                             text_window=args.c, 
                             seeding_scheme=args.seed_way,
-                            non_wm_temp=no_wm_temp)
+                            non_wm_temp=args.no_wm_temp)
             
             t1 = time()
 
@@ -343,7 +341,6 @@ for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
             return criical_value
 
 
-        alpha = 0.01
         different_s = ["log", "ars", 2, 1.5, 1, "opt-0.3", "opt-0.2", "opt-0.1"]
 
         mask = True
@@ -440,7 +437,6 @@ for used_model in ["facebook/opt-1.3b", "princeton-nlp/Sheared-LLaMA-2.7B"]:
 
             save_dir = f"poem_result/{model_name}-creat{creative_generation}-c{args.c}-m{args.m}-T{T}-temp{temp}-alpha{alpha}-{mask}-{task}{latter}.pkl"
             os.makedirs(os.path.dirname(save_dir), exist_ok=True)
-            print(save_dir)
             pickle.dump(result_dict, open(save_dir, "wb"))
 
             torch.cuda.empty_cache()

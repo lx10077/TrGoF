@@ -37,13 +37,19 @@ parser.add_argument('--language',default="french",type=str)
 parser.add_argument('--truncate_vocab',default=8,type=int)
 parser.add_argument('--non_wm_temp',default=0.7,type=float)
 
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
+parser.add_argument('--substitution', action='store_true', help="If set, substitution will be True; otherwise, it defaults to False.")
+parser.add_argument('--deletion', action='store_true', help="If set, deletion will be True; otherwise, it defaults to False.")
+parser.add_argument('--insertion', action='store_true', help="If set, insertion will be True; otherwise, it defaults to False.")
+parser.add_argument('--translation', action='store_true', help="If set, translation will be True; otherwise, it defaults to False.")
+
 args = parser.parse_args()
 
 ## We only corrupt the data.
-compute_sub = True
-compute_del = True
-compute_ist = True
-rt_translate1 = True
+compute_sub = args.substitution
+compute_del = args.deletion
+compute_ist = args.insertion
+rt_translate1 = args.translation
 
 
 latter = f"nsiuwm-{args.non_wm_temp}"  ## suffix for the generated texts
@@ -114,7 +120,7 @@ def define_range():
     return tqdm(np.linspace(0, (args.N-1)*0.05, args.N))
 
 
-all_temperatures = [0.1, 0.3, 0.5, 0.7, 1]
+all_temperatures = args.all_temp
 
 def get_name(temperature):
     name = f"raw_data/{model_prefix}B-Gumbel-c{args.c}-m{args.m}-T{args.T}-{args.seed_way}-15485863-temp{temperature}-{latter}.pkl"
@@ -258,7 +264,11 @@ if rt_translate1:
 
         corrupted_dataset["trans"]["curupt_water"] = copy.deepcopy(corrupted_watermark_data)
         corrupted_dataset["trans"]["curupt_water_text"] = corrupted_watermark_data_text
-        pickle.dump(corrupted_dataset,open(exp_name+f"-trans-{args.language}.pkl","wb"))
+        
+        output_path = exp_name + f"-trans-{args.language}.pkl"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as f:
+            pickle.dump(corrupted_dataset, f)
 
         torch.cuda.empty_cache()
         gc.collect()

@@ -31,6 +31,8 @@ parser.add_argument('--max_seed',default=100000,type=int)
 parser.add_argument('--norm',default=1,type=int)
 parser.add_argument('--rt_translate', action='store_true')
 parser.add_argument('--truncate_vocab',default=8,type=int)
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts."
+)
 args = parser.parse_args()
 print(args)
 
@@ -144,5 +146,5 @@ def generate_text_for_a_T(temp):
 
 
 if __name__ == "__main__":
-    for temp in [0.1, 0.3, 0.5, 0.7, 1]:
+    for temp in args.all_temp:
         generate_text_for_a_T(temp)

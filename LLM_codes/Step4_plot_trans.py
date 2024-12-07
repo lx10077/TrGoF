@@ -1,38 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import math as ma
 import numpy as np
-from tqdm import tqdm
-from IPython import embed
-from scipy.integrate import quad, dblquad
 from scipy.stats import gamma, norm
 import torch
-import json
 import argparse
 from collections import defaultdict
 
 
 parser = argparse.ArgumentParser(description="Experiment Settings")
-
 parser.add_argument('--method',default="Gumbel",type=str)
 parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
 # parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
 parser.add_argument('--seed',default=1,type=int)
-parser.add_argument('--temp',default=0.1, type=float)
 parser.add_argument('--c',default=5,type=int)
-parser.add_argument('--batch_size',default=8,type=int)
 parser.add_argument('--seed_way',default="noncomm_prf",type=str)
 parser.add_argument('--m',default=400,type=int)
 parser.add_argument('--T',default=1000,type=int)
-parser.add_argument('--N',default=4,type=int)
-parser.add_argument('--prompt_tokens',default=50,type=int)
-parser.add_argument('--buffer_tokens',default=20,type=int)
-parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--norm',default=1,type=int)
-parser.add_argument('--rt_translate', action='store_true')
+parser.add_argument('--non_wm_temp',default=0.7,type=float)
+parser.add_argument('--alpha',default=0.01,type=float)
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
 parser.add_argument('--language',default="french",type=str)
-parser.add_argument('--truncate_vocab',default=8,type=int)
 args = parser.parse_args()
 
 
@@ -45,14 +33,11 @@ else:
 
 key = args.seed
 torch.manual_seed(key)
-seed_key = 15485863
-segment = args.N
 c = args.c
 T = args.T
 m = args.m
 temp = args.temp
-
-
+alpha = args.alpha
 import pickle
 
 
@@ -88,8 +73,7 @@ def compute_score(Ys, alpha=1., s=2,eps=1e-10, mask=True):
     return m*np.max(final,axis=-1)
 
 
-print("Begining ploting")
-
+print("Begining ploting!!")
 
 def compute_quantile(m, alpha, s, mask):
     # for _ in range(500):
@@ -103,11 +87,10 @@ def compute_quantile(m, alpha, s, mask):
     return np.mean(qs,axis=0)
 
 
-def HC_for_a_given_fraction(Ys, ratio, alpha=0.05, s=2, mask=True):
+def HC_for_a_given_fraction(Ys, ratio, alpha=0.01, s=2, mask=True):
     # embed()
     m = (Ys.shape)[-1]
     if ratio <= 1 and type(ratio)==float:
-        print("full")
         given_m = int(ratio*m)
     else:
         given_m = ratio
@@ -159,7 +142,7 @@ def f_opt(r, delta):
     return np.log(inte_here*r**(delta/(1-delta))+ r**(1/rest-1))
 
 
-def h_opt_gum(Ys, delta0=0.2, alpha=0.05):
+def h_opt_gum(Ys, delta0=0.2, alpha=0.01):
     # Compute critical values
     Ys = np.array(Ys)
     check_points = np.arange(1, 1+Ys.shape[-1])
@@ -195,10 +178,8 @@ plt.rcParams.update({
 
 
 
-def plot_length_on_axis(current_ax, Y, alpha, x_name, legend=True, H="H1", KGW=None, mask=False):
+def plot_length_on_axis(current_ax, Y, alpha, x_name, legend=True, H="H1", mask=False):
     used_m = Y.shape[-1]
-    print(H, Y.shape)
-
     x = np.arange(1,1+used_m)
     result_set = defaultdict(dict)
     different_s = ["log", "ars", 2, 1.5, 1, 0.5, 0, "opt-0.3", "opt-0.2", "opt-0.1"]
@@ -272,35 +253,34 @@ def plot_length_on_axis(current_ax, Y, alpha, x_name, legend=True, H="H1", KGW=N
     current_ax.set_xlabel(rf"{x_name}")
     return result_set
 
-all_tempretures = [0.1, 0.3, 0.5, 0.7, 1]
+
+all_tempretures = args.all_temp
+this = args.language
 
 
-for num in [0.7]:
+for num in [args.non_wm_temp]:
     latter = f"nsiuwm-{num}"
-    print(latter)
-    for size in ["1p3"]:
-        for mask in [True, False]:
-            fig, ax = plt.subplots(nrows=1, ncols=len(all_tempretures), figsize=(4*len(all_tempretures),4))
-            alpha = 0.01
-            final_result = dict()
-            this="french"
+    for mask in [True, False]:
+        fig, ax = plt.subplots(nrows=1, ncols=len(all_tempretures), figsize=(4*len(all_tempretures),4))
+        final_result = dict()
 
-            for j, temp in enumerate(all_tempretures):
-                exp_name1 = f"result/{size}B-robust-c{c}-m{m}-T{T}-{args.seed_way}-{key}-temp{temp}-{this}-trans-{latter}.pkl"
+        for j, temp in enumerate(all_tempretures):
+            exp_name1 = f"result/{size}B-robust-c{c}-m{m}-T{T}-{args.seed_way}-{key}-temp{temp}-{this}-trans-{latter}.pkl"
+            results1 = pickle.load(open(exp_name1, "rb"))
+            sub_Ys = np.array(results1["trans"])[0]
+            print("Shape Y:", sub_Ys.shape)
 
-                print(exp_name1)
-                results1 = pickle.load(open(exp_name1, "rb"))
-                sub_Ys = np.array(results1["trans"])[0]
-                print("Shape Y:", sub_Ys.shape)
+            result = plot_length_on_axis(ax[j], sub_Ys[:,-200:], alpha,f"temp={temp}", legend=False, mask=mask)
+            final_result[temp] = result
 
-                result = plot_length_on_axis(ax[j], sub_Ys[:,-200:], alpha,f"temp={temp}", legend=False, mask=mask)
-                final_result[temp] = result
+        name = "trans" ## previous
 
-            name = "trans" ## previous
+        save_dir = f"trans_result/{size}B-{name}-c{c}-m{m}-T{T}-tempall-alpha{alpha}-{this}-{mask}-{latter}.pkl"
+        os.makedirs(os.path.dirname(save_dir), exist_ok=True)
+        pickle.dump(final_result, open(save_dir, "wb"))
 
-            save_dir = f"trans_result/{size}B-{name}-c{c}-m{m}-T{T}-tempall-alpha{alpha}-{this}-{mask}-{latter}.pkl"
-            pickle.dump(final_result, open(save_dir, "wb"))
-
-            plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
-            plt.tight_layout()
-            plt.savefig(f"trans_fig/{size}B-{name}-c{c}-m{m}-T{T}-translation-tempall-alpha{alpha}-{this}-{mask}-{latter}.pdf", dpi=300)
+        plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
+        plt.tight_layout()
+        fig_dir = f"trans_fig/{size}B-{name}-c{c}-m{m}-T{T}-translation-tempall-alpha{alpha}-{this}-{mask}-{latter}.pdf"
+        os.makedirs(os.path.dirname(fig_dir), exist_ok=True)
+        plt.savefig(fig_dir, dpi=300)

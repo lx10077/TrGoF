@@ -17,43 +17,34 @@ parser.add_argument('--method',default="Gumbel",type=str)
 parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
 # parser.add_argument('--model',default="princeton-nlp/Sheared-LLaMA-2.7B",type=str)
 parser.add_argument('--seed',default=1,type=int)
-parser.add_argument('--temp',default=0.1, type=float)
 parser.add_argument('--c',default=5,type=int)
-parser.add_argument('--batch_size',default=10,type=int)
 parser.add_argument('--seed_way',default="noncomm_prf",type=str)
 parser.add_argument('--m',default=400,type=int)
 parser.add_argument('--T',default=1000,type=int)
-parser.add_argument('--N',default=4,type=int)
-parser.add_argument('--prompt_tokens',default=50,type=int)
-parser.add_argument('--buffer_tokens',default=20,type=int)
-parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--norm',default=1,type=int)
 parser.add_argument('--non_wm_temp',default=0.7,type=float)
-parser.add_argument('--rt_translate', action='store_true')
-parser.add_argument('--language',default="french",type=str)
-parser.add_argument('--truncate_vocab',default=8,type=int)
+parser.add_argument('--alpha',default=0.01,type=float)
+parser.add_argument('--all_temp', nargs='+', type=float, default=[0.1, 0.3, 0.5, 0.7], help="A list of temperatures used to generate watermarked texts.")
+
 args = parser.parse_args()
 
 
 
 key = args.seed
 torch.manual_seed(key)
-seed_key = 15485863
-segment = args.N
 c = args.c
 T = args.T
 m = args.m
 mask = True
-
+alpha = args.alpha
 import pickle
 
 
-def compute_score(Ys, alpha=1., s=2,eps=1e-10, mask=mask):
+def compute_score(Ys, frac=1., s=2,eps=1e-10, mask=mask):
     # assert -1 <= s <= 2
     ps = 1- Ys
     ps = np.sort(ps, axis=-1)
     m = ps.shape[-1]
-    first = int(m* alpha)
+    first = int(m* frac)
     ps = ps[...,:first]
     rk = np.arange(1,1+first)/first
 
@@ -99,7 +90,7 @@ def compute_quantile(m, alpha, s, mask=True):
     return np.mean(qs,axis=0)
 
 
-def HC_for_a_given_fraction(Ys, ratio, alpha=0.05, s=2, mask=True):
+def HC_for_a_given_fraction(Ys, ratio, alpha=0.01, s=2, mask=True):
     m = (Ys.shape)[-1]
     if ratio <= 1 and type(ratio)==float:
         given_m = int(ratio*m)
@@ -135,7 +126,7 @@ def f_opt(r, delta):
     return np.log(inte_here*r**(delta/(1-delta))+ r**(1/rest-1))
     
 
-def h_opt_gum(Ys, delta0=0.1, alpha=0.05):
+def h_opt_gum(Ys, delta0=0.1, alpha=0.01):
     # Compute critical values
     Ys = np.array(Ys)
     check_points = np.arange(1, 1+Ys.shape[-1])
@@ -174,7 +165,7 @@ def compute_ind_q(q, mu, var, check_point):
     return np.array(qs)
 
 
-def plot_length_on_axis(current_ax, Y, alpha, x_name, legend=True, H="H1", KGW=None, log=False):
+def plot_length_on_axis(current_ax, Y, alpha, x_name, legend=True, H="H1", log=False):
     global different_s
     used_m = Y.shape[-1]
     print(H, Y.shape)
@@ -337,7 +328,6 @@ linestyles = ["-", "-.", "--","-.", ":", "--", "-.", ":","-.",]
 colors = ["tab:blue", "tab:orange", "black", "tab:purple", "tab:red",  "tab:pink", "tab:gray",   "tab:brown", "tab:green", ]
 results = dict()
 temperatures = [0.1, 0.3, 0.5, 0.7, 1]
-# used_roc_length = {0.1:100, 0.3:30, 0.7:10, 1:10}
 used_roc_length = {0.1:400, 0.3:400, 0.5:200, 0.7:80, 1:30}
 
 
@@ -386,7 +376,7 @@ def remove_repeated(Ys, filered_length=None,filter_data=False,first=500):
 
 print("Start plotting~!!")
 different_s = ["log", "ars", 2, 1.5, 1, "opt-0.3", "opt-0.2", "opt-0.1", "opt-0.05"]
-temperatures = [0.1, 0.3, 0.5, 0.7, 1]
+temperatures = args.all_temp
 lenght_for_temps = [400, 400, 400, 200, 30]
 
 
@@ -413,47 +403,41 @@ for num in [args.non_wm_temp]:
 
             print("Load Gum null results...\n")
             if "null" not in Gum_result:
-                print("copying here")
-                here_temp = 1 if (temp == 0.1 or temp == 0.5) else temp
-                Gum_name0 = f"/Workspace/Users/lixian@pennmedicine.upenn.edu/robust/result/{size}B-robust-c5-m400-T2500-{args.seed_way}-{key}-temp{here_temp}-sub.pkl"
-                null_result = pickle.load(open(Gum_name0, "rb"))
-
-                null_Ys =  np.array(null_result["null"])[0]
-                print("Orginal shape:", null_Ys.shape)
-                null_Ys = null_Ys[:5000]
-
-                Gum_result["null"] = null_Ys
-                pickle.dump(Gum_result, open(Gum_name, "wb"))
+                print("No results for null! Please run the Step 3 to obtains pivotal statistics for non-watermarked data.")
+                num_column = 2
             else:
                 null_Ys =  np.array(Gum_result["null"])
+                num_column = 3
 
-            fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(17,5))
-            print("Corruption level is", 0)
-            alpha = 0.01
+            fig, ax = plt.subplots(nrows=1, ncols=num_column, figsize=(5*num_column+2,5))
             
             if temp >= 0.5:
                 use_log = True
             else:
                 use_log = False
-            
-            # Gum_Ys= remove_repeated(Gum_Ys, filered_length=250)
-            # null_Ys = remove_repeated(null_Ys, filered_length=250)
-            # print("The Gum_Y shape is:", Gum_Ys.shape)
-            # print("The null shape is:", null_Ys.shape)
-
-            H1set = plot_length_on_axis(ax[0], null_Ys, alpha, "Unwatermarked text length", legend=False, H="H0", log=False)
-            H2set = plot_length_on_axis(ax[1], Gum_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
-            ROCset = plot_ROC(ax[2], null_Ys, Gum_Ys, truncated=used_roc_length[temp])
 
             final_result = dict()
-            final_result["H0-human"] = H1set
+
+            if num_column == 3:
+                H1set = plot_length_on_axis(ax[0], null_Ys, alpha, "Unwatermarked text length", legend=False, H="H0", log=False)
+                H2set = plot_length_on_axis(ax[1], Gum_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
+                ROCset = plot_ROC(ax[2], null_Ys, Gum_Ys, truncated=used_roc_length[temp])
+                final_result["H0-human"] = H1set
+            else:
+                H2set = plot_length_on_axis(ax[0], Gum_Ys, alpha, "Watermarked text length", legend=True, H="H1", log=use_log)
+                ROCset = plot_ROC(ax[1], null_Ys, Gum_Ys, truncated=used_roc_length[temp])   
+
             final_result["H1-watermark"] = H2set
             final_result["ROC"] = ROCset
 
-            notation = "intro"
+            notation = "power"
             save_dir = f"fig_data/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pkl"
+            os.makedirs(os.path.dirname(save_dir), exist_ok=True)
             pickle.dump(final_result, open(save_dir, "wb"))
 
             plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
             plt.tight_layout()
-            plt.savefig(f"fig/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pdf", dpi=300)
+
+            fig_dir = f"fig/{size}B-{notation}-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-{latter}.pdf"
+            os.makedirs(os.path.dirname(fig_dir), exist_ok=True)
+            plt.savefig(fig_dir, dpi=300)
