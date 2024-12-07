@@ -147,7 +147,7 @@ python Task1_poem.py \
   --c 5 \
   --m 400 \
   --T 1000 \
-  --all_temp 1 \
+  --temp 1 \
   --alpha 0.01
 ```
 

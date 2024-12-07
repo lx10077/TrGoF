@@ -148,7 +148,6 @@ new_tokens = args.m                           # number of tokens to generate
 buffer_tokens = args.buffer_tokens 
 no_wm_temp = args.no_wm_temp
 latter = f"-nsiuwm-{no_wm_temp}"
-print(latter)
 
 def f_opt(r, delta):
     inte_here = np.floor(1/(1-delta))
