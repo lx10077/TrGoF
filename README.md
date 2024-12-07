@@ -29,7 +29,7 @@ If you find this repository useful in your research, please consider citing:
 
 Follow these steps to reproduce the results:
 
-1. **Generate Watermarked Text**  
+### 1. Generate Watermarked Text
 
 This step creates watermarked text at various temperature settings. For example, the following command uses the OPT-1.3B model to generate 1,000 texts, each with a length of 400 tokens. It processes them in batches of 10, using the temperatures 0.1, 0.3, 0.5, and 0.7 in sequence:
 
@@ -43,8 +43,9 @@ python Step1_watermark_text.py \
   --all_temp 0.1 0.3 0.5 0.7
 ```
 
+---
 
-2. **Corrupt Watermarked Text**  
+### 2. Corrupt Watermarked Text
 
 This step applies various editing operations or round-trip translation to the previously generated watermarked text from Step 1. By default, Step 1 saves all generated texts, and now you can corrupt them using the following editing methods:
 
@@ -71,7 +72,9 @@ python Step2_corrupt_text.py \
   --translation
 ```
 
-3. **Compute Pivotal Statistics**  
+---
+
+### 3. Compute Pivotal Statistics
 
 This step calculates pivotal statistics for the edited (or corrupted) texts generated in Step 2. It processes all temperatures and editing methods used previously, so the command remains largely unchanged:
 
@@ -87,9 +90,6 @@ python Step3_compute_Y.py \
   --insertion \
   --translation
 ```
-
-4. **Plot Type II Errors**  
-Here’s a polished version of the README section:
 
 ---
 
@@ -126,7 +126,6 @@ In this step, we visualize the detection power (or Type II errors) under various
 
 - **Translation Edits:** Check results after applying round-trip translation.
 
-
   ```
   python Step4_plot_trans.py \
     --model "facebook/opt-1.3b" \
@@ -137,8 +136,9 @@ In this step, we visualize the detection power (or Type II errors) under various
     --alpha 0.01
   ```
  
- 
-5. **Compute Edit Tolerance Limits**  
+---
+
+### 5. Compute Edit Tolerance Limits
 
 Determine the “edit tolerance limit” by sequentially applying three types of random edits. For example, to estimate the edit tolerance limit using the OPT-1.3B model and Sheared-LLaMA-2.7B model at a temperature of 1 and a significance level \(\alpha = 0.01\), run:
 
@@ -151,7 +151,9 @@ python Task1_poem.py \
   --alpha 0.01
 ```
 
-6. **Adversarial Edits**  
+---
+
+### 6. Adversarial Edits
 
 This step performs adversarial edits on the watermarked text generated in Step 1, then computes pivotal statistics and plots detection power under these adversarial conditions.
 
