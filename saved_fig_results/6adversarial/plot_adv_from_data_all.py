@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import pickle
-from collections import defaultdict
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -14,11 +13,6 @@ plt.rcParams.update({
     'text.latex.preamble': r'\usepackage{amsfonts}'
 })
 
-seed_key = 15485863
-segment = 11
-c = 5
-T = 1000
-m = 400
 
 different_s = [1, 1.5, 2, "log", "ars", "opt-0.1"]
 colors = ['red',"purple" ,'green','gray','blue',"black"]
@@ -41,50 +35,52 @@ def from_s2label(s):
     
 
 all_tempretures = [0.1, 0.3, 0.5, 0.7]
+axis_index = [0, 1, 2, 3]
 alpha = 0.01
 mask = True
-this = "french"
 T = 1000
-
+num = 0.7
+star = 0
+c = 5
+m = 400
 for size in ["1p3", "2p7"]:
-    fig, ax = plt.subplots(nrows=1, ncols=len(all_tempretures), figsize=(3*len(all_tempretures)+1, 4))
-    save_dir = f"3translation/{size}B-trans-c5-m400-T{T}-tempall-alpha{alpha}-{this}-{mask}-nsiuwm-0.7.pkl"
-    results_dict = pickle.load(open(save_dir, "rb"))
-    star=0
+    alpha = 0.01
+    final_result = dict()
 
-    data_dict = defaultdict(dict)
-    for i, temp in enumerate(all_tempretures):
-        result_data = results_dict[temp]
+    all_corrupts = [10, 20, 40]
+    fig, ax = plt.subplots(nrows=len(all_corrupts), ncols=len(all_tempretures), figsize=(3*len(all_tempretures)+3, 3*len(all_corrupts)+3))
 
-        current_ax = ax[i]
-        j = -1
+    for l, corrupt in enumerate(all_corrupts):
+        for i, temp in enumerate(all_tempretures):
+            save_dir = f"6adversarial/{size}B-LLMNoLarge-c5-m400-T1000-alpha0.01-temp{temp}-{mask}-nsiuwm-{num}.pkl"
+            results_dict = pickle.load(open(save_dir, "rb"))
 
-        for s in different_s:
-            j += 1
-            x, y = result_data[s]["x"][star:], result_data[s]["y"][star:]
-            if temp >= 0.7:
-                current_ax.plot(x[:150],1-np.array(y)[:150], label=from_s2label(s), linestyle=linestyles[j%len(linestyles)], color=colors[j%len(colors)])
-            else:
+            result_data = results_dict[corrupt]
+            current_ax = ax[l][i]
+            j = -1
+
+            for s in different_s:
+                j += 1
+                x, y = result_data[s]["x"][star:], result_data[s]["y"][star:]
                 current_ax.plot(x,1-np.array(y), label=from_s2label(s), linestyle=linestyles[j%len(linestyles)], color=colors[j%len(colors)])
-        if i ==0:
-            current_ax.set_ylabel(r"Type II error")
-        current_ax.set_xlabel(r"Text length")
+            if i ==0:
+                current_ax.set_ylabel(r"Type II error")
+            current_ax.set_xlabel(r"Text length")
 
+            frac = int(corrupt/4)
+            text = r'$\mathrm{temp}$ ' + rf'$ = {temp}$, ' + r'$\mathrm{corr}$ ' + rf'$ = {frac}$\%'
+            current_ax.set_title(text)
 
-        current_ax.text(0.95, 0.95, r'$\mathrm{temp}$ ' + rf'$ = {temp}$', transform=current_ax.transAxes, fontsize=16,
-            verticalalignment='top', horizontalalignment='right')
-        if temp >= 0.5:
-            current_ax.set_yscale("log")
+            if (temp >= 0.5 and corrupt <= 20) or (temp == 0.7 and corrupt == 40):
+                current_ax.set_yscale("log")
 
     # Get handles and labels from one of the subplots for the shared legend
-    handles, labels = ax[0].get_legend_handles_labels()
+    handles, labels = ax[0][0].get_legend_handles_labels()
 
     # Create a shared legend on top of the figure
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=len(different_s), frameon=False)
 
     # Adjust layout to make space for the shared legend
-    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    plt.tight_layout(rect=[0, 0, 1, 0.98])
 
-    # ax[-1].legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
-    # plt.tight_layout()
-    plt.savefig(f"3translation/{size}B-trans-c{c}-m{m}-T{T}-tempall-{this}-{mask}-all.pdf", dpi=300)
+    plt.savefig(f"6adversarial/{size}B-adv-c{c}-m{m}-T{T}-tempall-corrupall-{mask}-all.pdf", dpi=300)

@@ -19,7 +19,7 @@ for size in ["1p3", "2p7"]:
             print("Creative generation:", creat)
             print("The task is:", task)
             temp = 1
-            save_dir = f"{size}B-creat{creat}-c{c}-m400-T100-temp{temp}-alpha0.01-True-{task}{latter}.pkl"
+            save_dir = f"4poem/{size}B-creat{creat}-c{c}-m400-T100-temp{temp}-alpha0.01-True-{task}{latter}.pkl"
             save_dict = pickle.load(open(save_dir, "rb"))
             result_lst = []
 

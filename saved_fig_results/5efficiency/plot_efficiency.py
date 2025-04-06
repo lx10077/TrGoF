@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import math as ma
 import numpy as np
-from tqdm import tqdm
-# Plot
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "Times New Roman" # Comment this if your computer doesn't support this font
 plt.rcParams.update({
-    'font.size': 14,
-    'text.usetex': True,
+    'font.size': 16,
+    'text.usetex': True, # Comment this if your computer doesn't support latex formula
     'text.latex.preamble': r'\usepackage{amsfonts}'
 })
 import scipy.special as sc
@@ -198,7 +195,7 @@ ax[0].set_xscale('log')
 ax[0].set_xticks([1e-3, 1e-2, 1e-1, 1],labels=[r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$10^{0}$"])
 ax[0].set_xlabel(r"$\Delta$")
 ax[0].set_ylabel(r"$R_{\mathcal{P}_{\Delta}}(\mathrm{detection~rule})$")
-ax[0].text(0.05, 0.95, rf'$\varepsilon=1$', transform=ax[0].transAxes, fontsize=14, verticalalignment='top', bbox=props)
+ax[0].text(0.05, 0.95, rf'$\varepsilon=1$', transform=ax[0].transAxes, fontsize=16, verticalalignment='top', horizontalalignment='left')
 print("For the second figure......")
 
 
@@ -235,11 +232,11 @@ ax[1].set_yscale('log')
 ax[1].set_xscale('log')
 ax[1].set_xticks([1e-3, 1e-2, 1e-1, 1],labels=[r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$10^{0}$"])
 ax[1].set_xlabel(r"$\Delta$")
-ax[1].set_ylabel(r"$R_{\mathcal{P}_{\Delta}}(\mathrm{detection~rule})$")
-ax[1].text(0.05, 0.95, rf'$\varepsilon=0.5$', transform=ax[1].transAxes, fontsize=14, verticalalignment='top', bbox=props)
+# ax[1].set_ylabel(r"$R_{\mathcal{P}_{\Delta}}(\mathrm{detection~rule})$")
+ax[1].text(0.05, 0.95, rf'$\varepsilon=0.5$', transform=ax[1].transAxes, fontsize=16, verticalalignment='top',  horizontalalignment='left')
 
 
-plt.legend(bbox_to_anchor =(1.05,1), loc='upper left',borderaxespad=0.)
+plt.legend(bbox_to_anchor =(1.05,1), loc='upper left', borderaxespad=0., frameon=False)
 # plt.legend()
 plt.tight_layout()
-plt.savefig(f'efficiency-robust.pdf', dpi=300)
+plt.savefig(f'5efficiency/efficiency-robust.pdf', dpi=300)

@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import math as ma
 import numpy as np
-from collections import defaultdict
-from sklearn.metrics import roc_auc_score
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.figure(figsize=[8, 6])
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "Times New Roman"  # Comment this if your computer doesn't support this font
 plt.rcParams.update({
-    'font.size': 14,
-    'text.usetex': True,
+    'font.size': 16,
+    'text.usetex': True, # Comment this if your computer doesn't support latex formula
     'text.latex.preamble': r'\usepackage{amsfonts}'
 })
 
@@ -49,7 +45,6 @@ def from_s2label(s):
 
 def plot_from_data(current_ax, result_set, list_s, x_name, legend=True, H="H1", log=False, truncated_x=None, label=True):
     j=-1
-    # current_ax.axis('scaled')
         
     for s in list_s:
         j+=1
@@ -122,8 +117,9 @@ def plot_roc_from_data(current_ax, result_set, list_s, legend=True, log=False, f
     pass
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+num = 0.7
 
-num=0.7
+## For Type II error
 
 for size in ["1p3", "2p7"]:
     nrows, ncols = 2, 4
@@ -140,13 +136,12 @@ for size in ["1p3", "2p7"]:
         print("Working on temperature:", temp)
         cor_level = 0
 
-        save_dir = f"{size}B-powertrun-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-nsiuwm-{num}.pkl"
+        save_dir = f"1power/{size}B-powertrun-c{c}-m{m}-T{T}-alpha{alpha}-temp{temp}-{mask}-nsiuwm-{num}.pkl"
         final_result = pickle.load(open(save_dir, "rb"))
         print(final_result.keys())
         H1set = final_result["H0-human"]
         H2set = final_result["H1-watermark"]
         roc_result = final_result["ROC"]
-
 
         if temp >= 0.7:
             truncated_x = 150
@@ -164,27 +159,44 @@ for size in ["1p3", "2p7"]:
             y_label = True
         else:
             y_label = False
-        plot_from_data(axsss[0,l], H2set, different_s, "Length of watermarked text", legend=False, H="H1", truncated_x=truncated_x, log=use_log, label=y_label)
-        axsss[0,l].text(0.05, 0.95, r'$\mathrm{temp}$ ' + rf'$ = {temp}$', transform=axsss[0,l].transAxes, fontsize=14,
-        verticalalignment='top', bbox=props)
+        plot_from_data(axsss[0,l], H2set, different_s, "Text length", legend=False, H="H1", truncated_x=truncated_x, log=use_log, label=y_label)
+        axsss[0,l].text(0.95, 0.95, r'$\mathrm{temp}$ ' + rf'$ = {temp}$', transform=axsss[0,l].transAxes, fontsize=16,
+        verticalalignment='top', horizontalalignment='right')
 
-        plot_roc_from_data(axsss[1,l], roc_result, different_s, legend=False, log=True, label=y_label)
+        use_log = True if temp >= 0.3 else False
+        plot_roc_from_data(axsss[1,l], roc_result, different_s, legend=False, log=use_log, label=y_label)
 
-        if used_roc_length[temp] >= 100:
-            loc_x, loc_y = 0.69, 0.95
-        else:
-            loc_x, loc_y = 0.72, 0.95
-
-        axsss[1,l].text(loc_x, loc_y, rf'$n={used_roc_length[temp]}$', transform=axsss[1,l].transAxes, fontsize=14,
-            verticalalignment='top', bbox=props)
+        axsss[1,l].text(0.95, 0.95, rf'$n={used_roc_length[temp]}$', transform=axsss[1,l].transAxes, fontsize=16,
+            verticalalignment='top', horizontalalignment='right')
 
     # Get handles and labels from one of the subplots for the shared legend
     handles, labels = axsss[0, 0].get_legend_handles_labels()
 
     # Create a shared legend on top of the figure
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=len(different_s), fontsize=14)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=len(different_s), fontsize=16, frameon=False)
 
     # Adjust layout to make space for the shared legend
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    plt.savefig(f"{size}B-robust-c{c}-m{m}-T{T}-tempall-{mask}-all-tight{num}.pdf", dpi=300)
+    plt.savefig(f"1power/{size}B-robust-c{c}-m{m}-T{T}-tempall-{mask}-all-tight{num}.pdf", dpi=300)
+
+## For Type I error
+
+num = 0.7
+size = "1p3"
+fig, axsss = plt.subplots(nrows=1, ncols=1, figsize=(6, 4))
+alpha = 0.01
+save_dir = f"1power/{size}B-powertrun-c{c}-m{m}-T{T}-alpha{alpha}-temp0.7-{mask}-nsiuwm-{num}.pkl"
+final_result = pickle.load(open(save_dir, "rb"))
+print(final_result.keys())
+H1set = final_result["H0-human"]
+H2set = final_result["H1-watermark"]
+roc_result = final_result["ROC"]
+
+axsss.set_ylim(0.006, 0.014)
+plot_from_data(axsss, H1set, different_s, "Text length", legend=False, H="H0", truncated_x=None, label=True)
+# Get handles and labels from one of the subplots for the shared legend
+handles, labels = axsss.get_legend_handles_labels()
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+plt.tight_layout()
+plt.savefig(f"1power/{size}B-power-null.pdf", dpi=300)

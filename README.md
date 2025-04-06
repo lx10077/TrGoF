@@ -25,9 +25,13 @@ If you find this repository useful in your research, please consider citing:
 └── README.md
 ```
 
+## Reproducing the Figures
+
+To reproduce the plots in our paper, navigate to the `saved_fig_results` directory and follow the instructions provided in its README file.
+
 ## Pipeline for LLM Experiments
 
-Follow these steps to reproduce the results:
+To reproduce the large language model experiments, follow the steps below using the code in the `LLM_codes` directory.
 
 ### 1. Generate Watermarked Text
 
