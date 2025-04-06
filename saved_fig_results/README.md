@@ -35,6 +35,11 @@ cd TrGoF/saved_fig_results
 
 ### 📗 Simulation Figures
 
+- **Figure 4** — *$P_{\Delta}$-Efficiency*  
+  ```bash
+  python 5efficiency/plot_efficiency.py
+  ```
+
 - **Figures 5, 13, 14** — *Histograms*  
   ```bash
   python 7histogram/plot_hist_TrGoF.py   # For Figures 5 and 13  
@@ -74,11 +79,6 @@ cd TrGoF/saved_fig_results
 - **Tables 1, 2** — *Edit Tolerance Limits*  
   ```bash
   python 4poem/compute_edit_tolerance_limit.py
-  ```
-
-- **Figure 4** — *$P_{\Delta}$-Efficiency*  
-  ```bash
-  python 5efficiency/plot_efficiency.py
   ```
 
 - **Figures 11, 19, 20** — *Adversarial Edits*  
