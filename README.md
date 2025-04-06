@@ -21,7 +21,7 @@ If you find this repository useful in your research, please consider citing:
 .
 ├── LLM_codes           # Code for language model experiments
 ├── simulation_codes    # Code for simulation studies
-├── saved_fig_results   # Data used for generating plots
+├── saved_fig_results   # Data and codes for generating plots
 └── README.md
 ```
 
@@ -31,7 +31,14 @@ To reproduce the plots in our paper, navigate to the `saved_fig_results` directo
 
 ## Pipeline for LLM Experiments
 
-To reproduce the large language model experiments, follow the steps below using the code in the `LLM_codes` directory.
+To reproduce the large language model experiments, first navigate to the `LLM_codes` directory:
+
+```bash
+cd LLM_codes
+```
+
+Then follow the steps below to run the experiments.
+
 
 ### 1. Generate Watermarked Text
 
