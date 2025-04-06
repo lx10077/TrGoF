@@ -28,15 +28,18 @@ color3 = "white"
 alpha = 0.05
 Nbins = 30
 use_density = True
+present_M2_result = False
 
 for mask in [True, False]:
     print("\nIf the truncation for Tr-GoF is", mask)
-    fig, ax = plt.subplots(ncols=len(s_lst), nrows=3, figsize=(len(s_lst)*3, 9))
+    nrows = 3 if present_M2_result else 2
+    fig, ax = plt.subplots(ncols=len(s_lst), nrows=nrows, figsize=(len(s_lst)*3, 3*nrows))
 
     results_dict=dict()
     ax[0,0].set_ylabel(r"Density")
     ax[1,0].set_ylabel(r"Density")
-    ax[2,0].set_ylabel(r"Density")
+    if present_M2_result:
+        ax[2,0].set_ylabel(r"Density")
     name = f'7histogram/uniform-robust-{N_trial}({K}-n{n_e}-p{p}-q{q}{direction})-{mask}'
     results_dict = json.load(open(name+".json", 'r'))
 
@@ -49,9 +52,15 @@ for mask in [True, False]:
 
         _, bins0, patches0 = ax[0][i%n_column].hist(score_H0, bins=Nbins, density=use_density, facecolor = color1, edgecolor=color3, linewidth=0.5)
         _, bins1, patches1 = ax[1][i%n_column].hist(score_H1, bins=Nbins, density=use_density, facecolor = color1, edgecolor=color3, linewidth=0.5)
-        _, bins2, patches2 = ax[2][i%n_column].hist(score_H2, bins=Nbins, density=use_density, facecolor = color1, edgecolor=color3, linewidth=0.5)
-
         quantile = np.quantile(score_H0, 1-alpha)
+
+        if present_M2_result:
+            _, bins2, patches2 = ax[2][i%n_column].hist(score_H2, bins=Nbins, density=use_density, facecolor = color1, edgecolor=color3, linewidth=0.5)
+            power2 = np.mean(score_H2>=quantile)
+            print(f"With s = {s}, M2, power =", power2)
+            for j in range(Nbins):
+                if bins2[j] >= quantile:
+                    patches2[j].set_fc(color2)
 
         for j in range(Nbins):
             if bins0[j] >= quantile:
@@ -63,21 +72,16 @@ for mask in [True, False]:
             if bins1[j] >= quantile:
                 patches1[j].set_fc(color2)
 
-        power2 = np.mean(score_H2>=quantile)
-        print(f"With s = {s}, M2, power =", power2)
-        for j in range(Nbins):
-            if bins2[j] >= quantile:
-                patches2[j].set_fc(color2)
-
         ax[0][i%n_column].set_title(f"$H_0, s={s}$")
         ax[0][i%n_column].text(0.05, 0.95, rf'$\alpha=0.05$', transform=ax[0][i%n_column].transAxes, fontsize=16,
             verticalalignment='top', horizontalalignment='left')
-        ax[1][i%n_column].set_title(r"$H_1^{\mathrm{m}},$" + f" $s={s}$")
+        ax[1][i%n_column].set_title(r"$H_1^{\mathrm{mix}},$" + f" $s={s}$")
         ax[1][i%n_column].text(0.05, 0.95, rf'$1-\beta={round(power,3)}$', transform=ax[1][i%n_column].transAxes, fontsize=16,
             verticalalignment='top', horizontalalignment='left')
-        ax[2][i%n_column].set_title(r"$H_1^{\mathrm{m}},$" + f" $s={s}$")
-        ax[2][i%n_column].text(0.05, 0.95, rf'$1-\beta={round(power2,3)}$', transform=ax[2][i%n_column].transAxes, fontsize=16,
-            verticalalignment='top', horizontalalignment='left')
+        if present_M2_result:
+            ax[2][i%n_column].set_title(r"$H_1^{\mathrm{mix}},$" + f" $s={s}$")
+            ax[2][i%n_column].text(0.05, 0.95, rf'$1-\beta={round(power2,3)}$', transform=ax[2][i%n_column].transAxes, fontsize=16,
+                verticalalignment='top', horizontalalignment='left')
 
     plt.tight_layout()
     plt.savefig(name+'-hist.pdf', dpi=300)

@@ -17,41 +17,33 @@ If you find this repository helpful for your research, please consider citing:
 
 ## How to Reproduce Figures and Tables
 
-To run the scripts below, make sure you are in the `saved_fig_results` directory.
+To run the scripts below, make sure you are in the `saved_fig_results` directory. You can do this by running:
+
+```bash
+cd TrGoF/saved_fig_results
+```
 
 ---
 
-### 📘 LLM Experiment Figures
+Of course! Here's the updated and polished version of your README section, with consistent formatting, corrected typos, and improved clarity:
 
-- **Figures 8, 9, 16** — *Statistical Power*  
-  ```bash
-  python 1power/plot_power_from_data.py
-  ```
+---
 
-- **Figures 10, 17** — *Robustness Evaluation*  
-  ```bash
-  python 2robust/plot_robust_from_data.py
-  ```
+## How to Reproduce Figures and Tables
 
-- **Figures 13, 18** — *Round-Trip Translation*  
-  ```bash
-  python 3translation/plot_trans_from_data.py
-  ```
+To run the scripts below, make sure you are in the `saved_fig_results` directory. You can do this by running:
 
-- **Tables 1, 2** — *Edit Tolerance Limits*  
-  ```bash
-  python 4poem/compute_edit_tolerance_limit.py
-  ```
+```bash
+cd TrGoF/saved_fig_results
+```
 
-- **Figure 4** — *$P_{\Delta}$-Efficiency*  
-  ```bash
-  python 5efficiency/plot_efficiency.py
-  ```
+---
 
-- **Figures 12, 19, 20** — *Adversarial Edits*  
+### 📖 Introduction Figures
+
+- **Figure 2, 3** — *Overview/Introduction Plot*  
   ```bash
-  python 6adversarial/plot_adv_from_data.py         # For Figure 12
-  python 6adversarial/plot_adv_from_data_all.py     # For Figures 19 and 20
+  python 0intro/plot_intro.py  # This script generates both figures
   ```
 
 ---
@@ -73,4 +65,39 @@ To run the scripts below, make sure you are in the `saved_fig_results` directory
 - **Figure 7** — *Failure of Existing Detection Rules*  
   ```bash
   python 8contour/plot_sumrule_boundary.py
+  ```
+
+---
+
+### 📘 LLM Experiment Figures
+
+- **Figures 8, 9, 16** — *Statistical Power*  
+  ```bash
+  python 1power/plot_power_from_data.py
+  ```
+
+- **Figures 10, 17** — *Robustness Evaluation*  
+  ```bash
+  python 2robust/plot_robust_from_data.py
+  ```
+
+- **Figures 12, 18** — *Round-Trip Translation*  
+  ```bash
+  python 3translation/plot_trans_from_data.py
+  ```
+
+- **Tables 1, 2** — *Edit Tolerance Limits*  
+  ```bash
+  python 4poem/compute_edit_tolerance_limit.py
+  ```
+
+- **Figure 4** — *$P_{\Delta}$-Efficiency*  
+  ```bash
+  python 5efficiency/plot_efficiency.py
+  ```
+
+- **Figures 11, 19, 20** — *Adversarial Edits*  
+  ```bash
+  python 6adversarial/plot_adv_from_data.py         # For Figure 11
+  python 6adversarial/plot_adv_from_data_all.py     # For Figures 19 and 20
   ```
