@@ -22,21 +22,6 @@ To run the scripts below, make sure you are in the `saved_fig_results` directory
 ```bash
 cd TrGoF/saved_fig_results
 ```
-
----
-
-Of course! Here's the updated and polished version of your README section, with consistent formatting, corrected typos, and improved clarity:
-
----
-
-## How to Reproduce Figures and Tables
-
-To run the scripts below, make sure you are in the `saved_fig_results` directory. You can do this by running:
-
-```bash
-cd TrGoF/saved_fig_results
-```
-
 ---
 
 ### 📖 Introduction Figures
