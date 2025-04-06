@@ -76,13 +76,13 @@ cd TrGoF/saved_fig_results
   python 3translation/plot_trans_from_data.py
   ```
 
-- **Tables 1, 2** — *Edit Tolerance Limits*  
-  ```bash
-  python 4poem/compute_edit_tolerance_limit.py
-  ```
-
 - **Figures 11, 19, 20** — *Adversarial Edits*  
   ```bash
   python 6adversarial/plot_adv_from_data.py         # For Figure 11
   python 6adversarial/plot_adv_from_data_all.py     # For Figures 19 and 20
+  ```
+  
+- **Tables 1, 2** — *Edit Tolerance Limits*  
+  ```bash
+  python 4poem/compute_edit_tolerance_limit.py
   ```
