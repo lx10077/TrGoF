@@ -20,7 +20,7 @@ def from_s2label(s):
     elif s == "ars":
         return r"Aaronson [1]"
     elif s == "opt-0.1" or s == "opt-0.2" or s == "opt-0.3":         
-        return r"Li et al. [48]"
+        return r"Li et al. [47]"
     elif s == 2 or s == 1 or s == 1.5:
         return r"$\mathrm{Tr}$-$\mathrm{GoF}$"
     else:
