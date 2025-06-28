@@ -15,6 +15,90 @@ If you find this repository useful in your research, please consider citing:
 }
 ```
 
+---
+
+## Key Idea
+
+We introduce a **truncated family of goodness‑of‑fit (Tr‑GoF) tests** that remain powerful after human edits.
+
+```python
+import numpy as np
+
+def compute_score(Ys, s: float = 2, eps: float = 1e-12,
+                  mask: bool = True, first: int | None = None) -> float:
+    '''Tr‑GoF test statistic.
+
+    Parameters
+    ----------
+    Ys   : 2‑D np.ndarray, [n_sample, n_token]
+        Pivotal probabilities in [0, 1].
+    s    : float
+        Divergence index. Supported: 2, 1, 0.5, 0, ‑1, and any ‑1 <= s <= 2.
+    eps  : float
+        Numerical stability constant.
+    mask : bool
+        Whether to truncate extreme order‑statistics for stability.
+    first: int | None
+        Use only the first `first` order‑statistics (truncation).
+
+    Returns
+    -------
+    float
+        a Tr-GoF score for each row, shape (n_sample, )
+    '''
+    # For Gumbel-max, p = 1 - Y since null = U(0, 1)
+    ps = np.sort(1 - Ys)                     # compute p-value. 
+    n  = ps.size
+    rk = np.arange(1, (first or n) + 1) / n  # empirical CDF ranks
+    if mask:                                 # perform truncation
+        keep = (ps >= 1/n) & (rk >= ps)
+        ps, rk = ps[keep], rk[keep]
+
+    if s == 1:
+        div = rk*np.log((rk+eps)/(ps+eps)) + (1-rk)*np.log((1-rk+eps)/(1-ps+eps))
+    elif s == 0:
+        div = ps*np.log((ps+eps)/(rk+eps)) + (1-ps)*np.log((1-ps+eps)/(1-rk+eps))
+    elif s in (2, -1):
+        base = rk if s == -1 else ps
+        div  = (rk - ps)**2 / (base*(1-base) + eps) / 2
+    elif s == 0.5:
+        div = 2*((np.sqrt(rk)-np.sqrt(ps))**2 + (np.sqrt(1-rk)-np.sqrt(1-ps))**2)
+    else:  # ‑1 < s < 0 or 0 < s < 1
+        div = (1 - rk**s*(ps+eps)**(1-s) - (1-rk)**s*(1-ps+eps)**(1-s)) / (s*(1-s))
+    return np.log(n * div.max()+eps)
+```
+
+Once all pivotal statistics are collected into an array (i.e., a matrix of shape `n_sample × n_token`), simply call `compute_score(Ys, s=2)` to obtain the Tr‑GoF statistic for each row.
+
+For quick testing or integration, you may paste the function into your own project and estimate the critical value via simulation as follows:
+
+```python
+def compute_quantile(m, alpha, s, mask, eps=1e-12):
+    """
+    Estimate the (1 - alpha) quantile of the Tr-GoF test statistic under the null,
+    based on repeated simulations from the uniform distribution.
+
+    Parameters:
+        m     : int     – Number of tokens (i.e., columns).
+        alpha : float   – Significance level.
+        s     : float   – Divergence parameter for the test.
+        mask  : bool    – Whether to apply masking in compute_score.
+        eps   : float   – Numerical stability constant.
+
+    Returns:
+        float – Estimated (1 - alpha) quantile of log-statistic.
+    """
+    qs = []
+    for _ in range(10):
+        raw_data = np.random.uniform(size=(10000, m))
+        stats = compute_score(raw_data, s=s, mask=mask)
+        q = np.quantile(np.log(stats + eps), 1 - alpha)
+        qs.append(q)
+    return np.mean(qs)
+```
+
+---
+
 ## Directory Structure
 
 ```plaintext
@@ -25,9 +109,13 @@ If you find this repository useful in your research, please consider citing:
 └── README.md
 ```
 
+---
+
 ## Reproducing the Figures
 
 To reproduce the plots in our paper, navigate to the `saved_fig_results` directory and follow the instructions provided in its README file.
+
+---
 
 ## Pipeline for LLM Experiments
 
