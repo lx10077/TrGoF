@@ -148,7 +148,7 @@ N = 20
 n_e = 4
 n = 10**n_e
 N_trial = 100
-s=0
+s = 2
 
 name = f"contour-{N}-{N_trial}-{K}-{n}-{s}"
 print(name)

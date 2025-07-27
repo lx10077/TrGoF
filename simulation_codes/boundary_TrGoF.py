@@ -189,7 +189,7 @@ def experiment_on_q(p, n, s):
 
 q = 0.4
 p = 0.3
-s = 0
+s = 2
 print(K, s)
 
 name = f'final-{p}-{q}-{K}-{N_trial}-{s}-p'
